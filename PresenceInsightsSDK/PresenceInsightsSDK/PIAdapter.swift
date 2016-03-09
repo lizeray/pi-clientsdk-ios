@@ -112,8 +112,6 @@ extension PIAdapter {
             return
         }
         
-        var device = device
-        
         let endpoint = _configURL + "/devices"
         
         device.registered = true
@@ -183,9 +181,8 @@ extension PIAdapter {
     */
     public func unregisterDevice(device: PIDevice, callback:(PIDevice?, NSError?)->()) {
         
-        var device_ = device
-        device_.registered = false
-        updateDevice(device_, callback: {newDevice, error in
+        device.registered = false
+        updateDevice(device, callback: {newDevice, error in
             guard let newDevice = newDevice where error == nil else {
                 callback(nil, error)
                 return
