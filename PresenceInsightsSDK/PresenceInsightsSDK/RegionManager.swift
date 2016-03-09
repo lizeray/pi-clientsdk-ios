@@ -21,26 +21,26 @@ import Foundation
 import CoreLocation
 
 internal class RegionManager {
-    private let _locationManager: CLLocationManager
-    private var _beaconRegions: [CLBeaconRegion] = []
-    private var _uuidRegions: [CLBeaconRegion] = []
-    private var _maxRegions: Int = 20
-    private var _numRegions: Int {
+    private let locationManager: CLLocationManager
+    private var beaconRegions: [CLBeaconRegion] = []
+    private var uuidRegions: [CLBeaconRegion] = []
+    private var maxRegions: Int = 20
+    private var numRegions: Int {
         get {
-            return _beaconRegions.count + _uuidRegions.count
+            return beaconRegions.count + uuidRegions.count
         }
     }
     
     init(locationManager: CLLocationManager) {
-        _locationManager = locationManager
+        self.locationManager = locationManager
 
-        let regions = _locationManager.monitoredRegions
+        let regions = locationManager.monitoredRegions
         for case let region as CLBeaconRegion in regions {
             if NSUUID(UUIDString: region.identifier) == nil {
-                _beaconRegions.append(createBeaconRegionFromCLRegion(region))
+                beaconRegions.append(createBeaconRegionFromCLRegion(region))
             } else {
                 // this will be a uuid region
-                _uuidRegions.append(createBeaconRegionFromCLRegion(region))
+                uuidRegions.append(createBeaconRegionFromCLRegion(region))
             }
         }
     }
@@ -48,16 +48,16 @@ internal class RegionManager {
     func start() {
         // to enable ranging in the background for iOS 9
         if #available(iOS 9, *) {
-            _locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.allowsBackgroundLocationUpdates = true
         }
-        _locationManager.startUpdatingLocation()
+        locationManager.startUpdatingLocation()
         // we are only interested in beacons, so this accuracy will not require Wifi or GPS, which will save battery
-        _locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
     }
 
     func stop() {
         removeAllRegions()
-        _locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingLocation()
     }
 
     func addUuidRegions(uuids: [String]) {
@@ -68,8 +68,8 @@ internal class RegionManager {
                 // will notify state of uuid region whenever the user turns on the screen of their device
                 region.notifyEntryStateOnDisplay = true
                 
-                self._locationManager.startMonitoringForRegion(region)
-                self._uuidRegions.append(region)
+                self.locationManager.startMonitoringForRegion(region)
+                self.uuidRegions.append(region)
             }
         }
     }
@@ -82,18 +82,18 @@ internal class RegionManager {
     
     func addBeaconRegion(beacon: CLBeacon) {
         let region = CLBeaconRegion(proximityUUID: beacon.proximityUUID, major: beacon.major.unsignedShortValue, minor: beacon.minor.unsignedShortValue, identifier: "\(beacon.proximityUUID.UUIDString);\(beacon.major);\(beacon.minor)")
-        if _numRegions >= _maxRegions {
-            let removedRegion = _beaconRegions.removeLast()
-            _locationManager.stopMonitoringForRegion(removedRegion)
+        if numRegions >= maxRegions {
+            let removedRegion = beaconRegions.removeLast()
+            locationManager.stopMonitoringForRegion(removedRegion)
         }
-        _beaconRegions.append(region)
-        _locationManager.startMonitoringForRegion(region)
+        beaconRegions.append(region)
+        locationManager.startMonitoringForRegion(region)
     }
     
     func didEnterRegion(region: CLBeaconRegion) {
-        for uuidRegion in _uuidRegions {
+        for uuidRegion in uuidRegions {
             if uuidRegion.identifier.lowercaseString == region.identifier.lowercaseString {
-                _locationManager.startRangingBeaconsInRegion(uuidRegion)
+                locationManager.startRangingBeaconsInRegion(uuidRegion)
                 break
             }
         }
@@ -106,13 +106,13 @@ internal class RegionManager {
     }
 
     func didExitRegion(region: CLBeaconRegion){
-        for uuidRegion in _uuidRegions {
+        for uuidRegion in uuidRegions {
             if uuidRegion.identifier.lowercaseString == region.identifier.lowercaseString {
-                _locationManager.stopRangingBeaconsInRegion(uuidRegion)
-                for beaconRegion in _beaconRegions {
-                    _locationManager.stopMonitoringForRegion(beaconRegion)
+                locationManager.stopRangingBeaconsInRegion(uuidRegion)
+                for beaconRegion in beaconRegions {
+                    locationManager.stopMonitoringForRegion(beaconRegion)
                 }
-                _beaconRegions = []
+                beaconRegions = []
                 break
             }
         }
@@ -120,19 +120,19 @@ internal class RegionManager {
     
     func removeAllRegions() {
         // stop ranging
-        for region in self._locationManager.rangedRegions {
+        for region in self.locationManager.rangedRegions {
             let beaconRegion = CLBeaconRegion(proximityUUID: NSUUID(UUIDString: region.identifier)!, identifier: region.identifier)
-            _locationManager.stopRangingBeaconsInRegion(beaconRegion)
+            locationManager.stopRangingBeaconsInRegion(beaconRegion)
         }
 
         // stop monitoring
-        for case let region as CLBeaconRegion in self._locationManager.monitoredRegions {
-            _locationManager.stopMonitoringForRegion(region)
+        for case let region as CLBeaconRegion in self.locationManager.monitoredRegions {
+            locationManager.stopMonitoringForRegion(region)
         }
 
         // clear region arrays
-        _uuidRegions = []
-        _beaconRegions = []
+        uuidRegions = []
+        beaconRegions = []
     }
     
     func createBeaconRegionFromCLRegion(region: CLRegion) -> CLBeaconRegion {
