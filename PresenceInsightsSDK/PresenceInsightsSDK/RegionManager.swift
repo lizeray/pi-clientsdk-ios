@@ -36,11 +36,15 @@ internal class RegionManager {
 
         let regions = locationManager.monitoredRegions
         for case let region as CLBeaconRegion in regions {
-            if NSUUID(UUIDString: region.identifier) == nil {
-                beaconRegions.append(createBeaconRegionFromCLRegion(region))
+            if let _ = NSUUID(UUIDString: region.identifier) {
+				// this will be a uuid region
+				if let newRegion = createBeaconRegionFromCLRegion(region) {
+					uuidRegions.append(newRegion)
+				}
             } else {
-                // this will be a uuid region
-                uuidRegions.append(createBeaconRegionFromCLRegion(region))
+				if let newRegion = createBeaconRegionFromCLRegion(region) {
+					beaconRegions.append(newRegion)
+				}
             }
         }
     }
@@ -100,8 +104,8 @@ internal class RegionManager {
     }
     
     func didDetermineState(state: CLRegionState, region: CLRegion) {
-        if let region_ = region as? CLBeaconRegion where state.rawValue == CLRegionState.Inside.rawValue {
-            didEnterRegion(region_)
+        if let region = region as? CLBeaconRegion where state == .Inside {
+            didEnterRegion(region)
         }
     }
 
@@ -135,16 +139,38 @@ internal class RegionManager {
         beaconRegions = []
     }
     
-    func createBeaconRegionFromCLRegion(region: CLRegion) -> CLBeaconRegion {
+    func createBeaconRegionFromCLRegion(region: CLRegion) -> CLBeaconRegion? {
         let components = region.identifier.componentsSeparatedByString(";")
-        var beaconRegion: CLBeaconRegion
-        
-        // beacon region (id = uuid;major;minor)
-        if (components.count > 1) {
-            beaconRegion = CLBeaconRegion(proximityUUID: NSUUID(UUIDString: components[0])!, major: CUnsignedShort(components[1])!, minor: CUnsignedShort(components[2])!, identifier: region.identifier)
-        } else {
-            beaconRegion = CLBeaconRegion(proximityUUID: NSUUID(UUIDString: components[0])!, identifier: region.identifier)
-        }
-        return beaconRegion
+
+		guard let uuidComponent = components.first else {
+			// TODO: Logging
+			return nil
+		}
+
+		guard let proximityUUID = NSUUID(UUIDString: uuidComponent) else {
+			// TODO: Logging
+			return nil
+		}
+
+		switch components.count {
+		case 3:
+			guard
+				let major = UInt16(components[1]),
+				let minor = UInt16(components[2]) else {
+					// TODO: Logging
+					return nil
+			}
+			// beacon region (id = uuid;major;minor)
+			let beaconRegion = CLBeaconRegion(proximityUUID: proximityUUID, major: major, minor: minor, identifier: region.identifier)
+			return beaconRegion
+		case 1:
+			let beaconRegion = CLBeaconRegion(proximityUUID: proximityUUID, identifier: region.identifier)
+			return beaconRegion
+
+		default:
+			//TODO: Logging
+			return nil
+		}
+
     }
 }
