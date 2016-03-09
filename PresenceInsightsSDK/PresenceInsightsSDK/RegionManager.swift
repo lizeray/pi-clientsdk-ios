@@ -35,7 +35,7 @@ internal class RegionManager {
         _locationManager = locationManager
 
         let regions = _locationManager.monitoredRegions
-        for region: CLRegion in regions {
+        for case let region as CLBeaconRegion in regions {
             if NSUUID(UUIDString: region.identifier) == nil {
                 _beaconRegions.append(createBeaconRegionFromCLRegion(region))
             } else {
