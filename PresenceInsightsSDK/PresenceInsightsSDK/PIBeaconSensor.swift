@@ -35,21 +35,21 @@ public class PIBeaconSensor: NSObject {
     
     public weak var delegate: PIBeaconSensorDelegate?
     
-    private let _piAdapter: PIAdapter
-    private let _locationManager: CLLocationManager
-    private let _regionManager: RegionManager
-    private var _lastDetected: NSDate?
+    private let piAdapter: PIAdapter
+    private let locationManager: CLLocationManager
+    private let regionManager: RegionManager
+    private var lastDetected: NSDate?
     
     public init(adapter: PIAdapter) {
         
-        _piAdapter = adapter
-        _locationManager = CLLocationManager()
-        _locationManager.requestAlwaysAuthorization()
-        _regionManager = RegionManager(locationManager: _locationManager)
+        piAdapter = adapter
+        locationManager = CLLocationManager()
+        locationManager.requestAlwaysAuthorization()
+        regionManager = RegionManager(locationManager: locationManager)
         
         super.init()
         
-        _locationManager.delegate = self
+        locationManager.delegate = self
     }
     
     /**
@@ -58,7 +58,7 @@ public class PIBeaconSensor: NSObject {
     - parameter callback: Returns result of starting the sensor as a boolean.
     */
     public func start(callback:(NSError?)->()) {
-        _piAdapter.getAllBeaconRegions({regions, error in
+        piAdapter.getAllBeaconRegions({regions, error in
             
             guard let regions = regions where error == nil else {
                 callback(error)
@@ -66,10 +66,10 @@ public class PIBeaconSensor: NSObject {
             }
             
             if regions.count > 0 {
-                self._regionManager.start()
-                self._regionManager.addUuidRegions(regions)
+                self.regionManager.start()
+                self.regionManager.addUuidRegions(regions)
             } else {
-                self._piAdapter.printDebug("No Regions to monitor.")
+                self.piAdapter.printDebug("No Regions to monitor.")
             }
             callback(nil)
         })
@@ -82,7 +82,7 @@ public class PIBeaconSensor: NSObject {
     */
     public func start() {
         start({error in
-            self._piAdapter.printDebug("Failed to start beacon sensing: \(error)")
+            self.piAdapter.printDebug("Failed to start beacon sensing: \(error)")
         })
     }
     
@@ -90,8 +90,8 @@ public class PIBeaconSensor: NSObject {
     Public function to stop beacon sensing and ranging.
     */
     public func stop() {
-        _piAdapter.printDebug("Stopped sensing for beacons.")
-        _regionManager.stop()
+        piAdapter.printDebug("Stopped sensing for beacons.")
+        regionManager.stop()
     }
     
     
@@ -153,33 +153,33 @@ public class PIBeaconSensor: NSObject {
 extension PIBeaconSensor: CLLocationManagerDelegate {
     
     public func locationManager(manager: CLLocationManager, didDetermineState state: CLRegionState, forRegion region: CLRegion) {
-        _regionManager.didDetermineState(state, region: region)
+        regionManager.didDetermineState(state, region: region)
     }
 
     public func locationManager(manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        _piAdapter.printDebug("Did Enter Region: " + region.description)
+        piAdapter.printDebug("Did Enter Region: " + region.description)
         guard let region = region as? CLBeaconRegion else {
             return
         }
-        _regionManager.didEnterRegion(region)
+        regionManager.didEnterRegion(region)
         if let d = delegate {
             d.didEnterRegion(region)
         }
     }
     
     public func locationManager(manager: CLLocationManager, didExitRegion region: CLRegion) {
-        _piAdapter.printDebug("Did Exit Region: " + region.description)
+        piAdapter.printDebug("Did Exit Region: " + region.description)
         guard let region = region as? CLBeaconRegion else {
             return
         }
-        _regionManager.didExitRegion(region)
+        regionManager.didExitRegion(region)
         if let d = delegate {
             d.didExitRegion(region)
         }
     }
     
     public func locationManager(manager: CLLocationManager, didRangeBeacons beacons: [CLBeacon], inRegion region: CLBeaconRegion) {
-        _piAdapter.printDebug("Did Range Beacons In Region: " + region.description)
+        piAdapter.printDebug("Did Range Beacons In Region: " + region.description)
         
         if (beacons.isEmpty) {
             return
@@ -187,7 +187,7 @@ extension PIBeaconSensor: CLLocationManagerDelegate {
         
         let detectedTime = NSDate()
         let lastReport: NSTimeInterval!
-        if let lastDetected = _lastDetected {
+        if let lastDetected = lastDetected {
             lastReport = detectedTime.timeIntervalSinceDate(lastDetected)
         } else {
             lastReport = PI_REPORT_INTERVAL + 1
@@ -198,38 +198,38 @@ extension PIBeaconSensor: CLLocationManagerDelegate {
             let filteredBeacons = beacons.filter({ $0.accuracy > 0 })
             // if all beacons in the list are of unknown distance we still send the first one
             if (filteredBeacons.isEmpty) {
-                _piAdapter.sendBeaconPayload([self.createDictionaryWith(beacons.first!, detectedTime: detectedTime)])
+                piAdapter.sendBeaconPayload([self.createDictionaryWith(beacons.first!, detectedTime: detectedTime)])
             } else {
-                _piAdapter.sendBeaconPayload([self.createDictionaryWith(filteredBeacons.first!, detectedTime: detectedTime)])
+                piAdapter.sendBeaconPayload([self.createDictionaryWith(filteredBeacons.first!, detectedTime: detectedTime)])
             }
-            _lastDetected = detectedTime
+            lastDetected = detectedTime
         }
         
         if let d = delegate {
             d.didRangeBeacons(beacons)
         }
         
-        _regionManager.addBeaconRegions(beacons)
+        regionManager.addBeaconRegions(beacons)
     }
     
     public func locationManager(manager: CLLocationManager, didStartMonitoringForRegion region: CLRegion) {
         if let r = region as? CLBeaconRegion {
-            _piAdapter.printDebug("Started monitoring region: " + r.proximityUUID.UUIDString)
+            piAdapter.printDebug("Started monitoring region: " + r.proximityUUID.UUIDString)
         }
     }
     
     public func locationManager(manager: CLLocationManager, monitoringDidFailForRegion region: CLRegion?, withError error: NSError) {
         if let r = region as? CLBeaconRegion {
-            _piAdapter.printDebug("Failed to monitor for region: " + r.proximityUUID.UUIDString + " Error: \(error)")
+            piAdapter.printDebug("Failed to monitor for region: " + r.proximityUUID.UUIDString + " Error: \(error)")
         }
     }
     
     public func locationManager(manager: CLLocationManager, rangingBeaconsDidFailForRegion region: CLBeaconRegion, withError error: NSError) {
-        _piAdapter.printDebug("Failed to range beacons in region: " + region.proximityUUID.UUIDString + " Error: \(error)")
+        piAdapter.printDebug("Failed to range beacons in region: " + region.proximityUUID.UUIDString + " Error: \(error)")
     }
     
     public func locationManager(manager: CLLocationManager, didFailWithError error: NSError) {
-        _piAdapter.printDebug("Location Manager failed with error: \(error)")
+        piAdapter.printDebug("Location Manager failed with error: \(error)")
     }
     
 }
